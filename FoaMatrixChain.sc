@@ -225,15 +225,17 @@ FoaMatrixChain {
 
 	loadXForms {
 		var xformSpecs;
-		// [
-		// 	'xformName',
-		// 	[	// this order defines the order of arguments passed to the transform matrix
-		// 		ctl1Name, ctl1Spec,
-		// 		ctl2Name, ctl2Spec,
-		// 		...
-		// 	],
-		// 	{ |mtx, ctl1, ctl2, ..| FoaXformerMatrix.newTransform(ctl1, ctl2).matrix * mtx }
-		// ]
+		/*
+		[
+			'xformName',
+			[	// this order defines the order of arguments passed to the transform matrix
+				ctl1Name, ctl1Spec,
+				ctl2Name, ctl2Spec,
+				...
+			],
+			{ |mtx, ctl1, ctl2, ..| FoaXformerMatrix.newTransform(ctl1, ctl2).matrix * mtx }
+		]
+		*/
 
 		xformSpecs = [
 			'push', [
@@ -444,10 +446,10 @@ FoaMatrixChain {
 	// based on Jo Anderson's MUSE 'aed' function
 	// see also Tapani Pihlajamäki - Multi-resolution Short-time Fourier Transform Implementation of Directional Audio Coding (ch. 6)
 	// http://lib.tkk.fi/Dipl/2009/urn100011.pdf
-	*aedFromMatrix { |aMatrix|
+	*aedFromMatrix { |matrix|
 		var b, pv_mean, b_sqrd_mean, p_sqrd, v_sqrd, a, e, d, d_norm, amp;
 
-		b = aMatrix.getCol(0);
+		b = matrix.getCol(0);
 		b[0] = b[0] * sqrt(2);			// scale W
 		b_sqrd_mean = b**2;
 		p_sqrd = b_sqrd_mean[0];		// W component, pressure
@@ -470,12 +472,12 @@ FoaMatrixChain {
 		^[a, e, d_norm, amp.abs.ampdb];
 	}
 
-	*aerEFromMatrix { |aMatrix|
+	*aerEFromMatrix { |matrix|
 		var b, pressure, velocity,
 		activeIntensityVec, potentialEnergy, kineticEnergy, meanEnergy,
 		eVec, eVec_sqrd, az, el, rE, amp;
 
-		b = aMatrix.getCol(0); 				 // b-format "signal"
+		b = matrix.getCol(0); 				 // b-format "signal"
 		pressure = b[0] * sqrt(2);			 // w * 2.sqrt
 		velocity = b[1..3];					 // [x,y,z]
 
