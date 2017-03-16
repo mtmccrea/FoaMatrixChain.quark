@@ -96,6 +96,7 @@ FoaMatrixChain {
 	}
 
 	setParam { | whichChain, index, ctlDex, value |
+		this.checkLinkExists(whichChain, index) ?? {^this};
 		chains[whichChain][index].controlStates[ctlDex] = if( value.isKindOf( Symbol ) )
 		{ this.getLinkByKey( value ) } // for controls with input index parameter
 		{ value };
@@ -116,7 +117,7 @@ FoaMatrixChain {
 	// for changing the transform at a point in the chain
 	replaceTransform { | newXformName, whichChain, index ... params |
 		var newLink, formerLink;
-
+		this.checkLinkExists(whichChain, index) ?? {^this};
 		newLink = this.createXformLink(newXformName, *params);
 		formerLink = chains[whichChain][index];
 		chains[whichChain].put( index, newLink );
@@ -128,29 +129,55 @@ FoaMatrixChain {
 
 	removeTransform { | whichChain, index |
 		var rmvdLink;
-
+		this.checkLinkExists(whichChain, index) ?? {^this};
 		rmvdLink = chains[whichChain][index];
-
 		chains[whichChain].removeAt(index);
-
 		// update any xform inputs that were removed before .chainXForms
 		this.checkIfInputRemoved( rmvdLink );
-
 		this.chainXForms;
-
 		this.changed( \transformRemoved, whichChain, index );
 	}
 
 	muteXform { | bool, whichChain, index |
+		this.checkLinkExists(whichChain, index) ?? {^this};
 		chains[whichChain][index].muted = bool;
 		this.chainXForms;
 		this.changed( \transformMuted, whichChain, index, bool );
 	}
 
 	soloXform { | bool, whichChain, index |
-		chains[whichChain][index].soloed = bool;
+		var changed = List();
+		this.checkLinkExists(whichChain, index) ?? {^this};
+		// keep a list of the solo states that are changing
+		changed.add([whichChain, index, bool]);
+
+		if (bool) { // if activating solo
+			chains.do{ |chain, i|
+				chain.do{ |lnk, j|
+					if (lnk.soloed) {
+						lnk.soloed = false; 			// ... un-solo anything else that's soloed
+						changed.add([i,j,false]); // keep track of the changes
+					}
+				}
+			}
+		};
+
+		chains[whichChain][index].soloed = bool; // perform this solo
+
 		this.chainXForms;
-		this.changed( \transformSoloed, whichChain, index, bool );
+		changed.do{|whichDxBool|
+			this.changed( \transformSoloed, *whichDxBool );
+		}
+	}
+
+	checkLinkExists { |whichChain, index|
+		var warning;
+		warning = format("No transform found at chain % index %", whichChain, index);
+		try {chains[whichChain][index]} {warning.warn; ^nil};
+		// return the link. this can be nil if
+		// only the index is out of range but whichChain isn't
+		// so it should still get caught by the receiver
+		^chains[whichChain][index] ?? {warning.warn; nil};
 	}
 
 	checkIfInputRemoved { | rmvdLink, replacementLink |
@@ -165,7 +192,6 @@ FoaMatrixChain {
 				}
 			}
 		}
-
 	}
 
 	// Note: the output soundfield will always be the result of the
@@ -204,7 +230,7 @@ FoaMatrixChain {
 								xf.mtx_( mtx ); 				// store resulting matrix
 								xf.soloed.if{break.()}	// stop chaining here if solo'd
 							},{
-								"skipping muted xform".postln;
+								xf.mtx_( mtx ); 				// xf is muted or "thru", forward the preceding the matrix
 							});
 						}
 					);
