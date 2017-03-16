@@ -24,8 +24,9 @@ FoaMatrixChain {
 		this.changed(\chainAdded, index);
 
 		if(index == 0)
-		{ this.addTransform( 'a soundfield', index, 0 ) } // head of chain
-		{ this.addTransform( 'input soundfield', index, 0,
+		{ this.addTransform( 'a soundfield', index, 0 ) } // first "transform" in first chain
+		{ this.addTransform( 															// head of a new chain
+			'input soundfield', index, 0,
 			// pass the last transform in previous chain
 			chains[ index-1 ][ chains[index-1].size - 1 ]
 			)
@@ -54,7 +55,7 @@ FoaMatrixChain {
 	clear { this.reset }
 
 	// initializes and returns the dictionary with transform attributes
-	// optionally params for setting initial control vals
+	// and optionally params for setting initial control vals
 	createXformLink { | xformName ... params |
 		var link, controls;
 
@@ -112,7 +113,6 @@ FoaMatrixChain {
 		this.changed(\transformAdded, xformName, whichChain, index);
 	}
 
-
 	// for changing the transform at a point in the chain
 	replaceTransform { | newXformName, whichChain, index ... params |
 		var newLink, formerLink;
@@ -141,8 +141,19 @@ FoaMatrixChain {
 		this.changed( \transformRemoved, whichChain, index );
 	}
 
-	checkIfInputRemoved { | rmvdLink, replacementLink |
+	muteXform { | bool, whichChain, index |
+		chains[whichChain][index].muted = bool;
+		this.chainXForms;
+		this.changed( \transformMuted, whichChain, index, bool );
+	}
 
+	soloXform { | bool, whichChain, index |
+		chains[whichChain][index].soloed = bool;
+		this.chainXForms;
+		this.changed( \transformSoloed, whichChain, index, bool );
+	}
+
+	checkIfInputRemoved { | rmvdLink, replacementLink |
 		chains.do{ |chain, i|
 			chain.do{ |lnk, j|
 				var cStates = lnk.controlStates;
@@ -157,44 +168,48 @@ FoaMatrixChain {
 
 	}
 
-
 	// Note: the output soundfield will always be the result of the
 	// last transform in the last transform chain
 	chainXForms {
 		var mtx;
+		block {|break|
+			chains.do{ |chain, i|
+				chain.do{ |xf, j|
 
-		chains.do{ |chain, i|
-			chain.do{ |xf, j|
+					if( (i == 0) and: (j == 0),
+						{	// init input soundfield for first chain
+							mtx = Matrix.newIdentity(4);
+							xf.mtx_( mtx );
+							curXformMatrix = mtx; // init var
+						},
+						{ // Note: names set to 'mute' ('-') or .muted are skipped
+							// 'mute' is a psuedo transform ('-'), like a pass-through,
+							// while .muted is a state
+							( (xf.name != 'mute') and: xf.muted.not).if({
+								var ctlStates, ctlVals;
 
-				if( (i == 0) and: (j == 0),
-					{	// init input soundfield for first chain matrix result
-						mtx = Matrix.newIdentity(4);
-						xf.mtx_( mtx );
-						curXformMatrix = mtx; // init var
-					},
-					{
-						// Note: names set to 'mute' ('-') are skipped
-						( xf.name != 'mute' ).if{
-							var ctlStates, ctlVals;
+								ctlStates = xf.controlStates;
 
-							ctlStates = xf.controlStates;
+								ctlVals = ctlStates.indices.collect({ |dex|
+									var val = ctlStates[dex];
+									if( val.isKindOf( FoaMatrixChainLink ) )
+									{ val.mtx }
+									{ val };
+								});
 
-							ctlVals = ctlStates.indices.collect({ |dex|
-								var val = ctlStates[dex];
-								if( val.isKindOf( FoaMatrixChainLink ) )
-								{ val.mtx }
-								{ val };
+								// pass in preceding soundfield followed by the control
+								// values for the transform operation, in order
+								mtx = xFormDict[xf.name]['getMatrix'].( mtx, *ctlVals );
+
+								xf.mtx_( mtx ); 				// store resulting matrix
+								xf.soloed.if{break.()}	// stop chaining here if solo'd
+							},{
+								"skipping muted xform".postln;
 							});
-
-							// pass in preceding soundfield followed by the control
-							// values for the transform operation, in order
-							mtx = xFormDict[xf.name]['getMatrix'].( mtx, *ctlVals );
-
-							xf.mtx_( mtx ); // store resulting matrix
-						};
-					}
-				);
-			}
+						}
+					);
+				}
+			};
 		};
 
 		verbose.if{ this.postChain };
@@ -206,7 +221,11 @@ FoaMatrixChain {
 	postChain {
 		chains.do{ |chain, i|
 			("\nCHAIN "++i).postln;
-			chain.do{ |xf, j| postf( "\t%, %\n", xf.name, xf.controlStates ) };
+			chain.do{ |xf, j|
+				postf( "\t%, % %\n", xf.name, xf.controlStates,
+					if(xf.muted,{"[MUTED]"},{""})++if(xf.soloed,{"[SOLOED]"},{""})
+				)
+			};
 			"".postln;
 		};
 	}
@@ -513,12 +532,14 @@ FoaMatrixChain {
 
 FoaMatrixChainLink {
 	var <>name; // copyArgs
-	var <>controlStates, <>mtx;
+	var <>controlStates, <>mtx, <>muted, <>soloed;
 
 	*new { | xformName | ^super.newCopyArgs(xformName).init }
 
 	init {
 		controlStates = Order();
 		mtx = nil;
+		muted = false;
+		soloed = false;
 	}
 }
