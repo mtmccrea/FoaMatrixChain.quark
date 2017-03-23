@@ -143,13 +143,39 @@ FoaMatrixChain {
 		chains[whichChain][index].muted = bool;
 		this.chainXForms;
 		this.changed( \transformMuted, whichChain, index, bool );
+
+		// if another xf is soloed, re-perform the solo
+		// in case this un-mute changes its color
+		// downstream from a soloed xf
+		block {|break|
+			chains[..whichChain].do{|chain,i|
+				if (i<whichChain) {
+					chain.do{|xf,j|
+						xf.soloed.if{
+"caught it1".postln;
+							this.changed(\transformSoloed,i,j);
+
+							break.();
+						}
+					}
+				} {
+					chain[..index].do{|xf,j|
+						xf.soloed.if{
+"caught it2".postln;
+							this.changed(\transformSoloed,i,j);
+
+							break.();
+						}
+					}
+				}
+			}
+		}
 	}
 
 	soloXform { | bool, whichChain, index |
 		var changed = List();
 		this.checkLinkExists(whichChain, index) ?? {^this};
 		// keep a list of the solo states that are changing
-		changed.add([whichChain, index, bool]);
 
 		if (bool) { // if activating solo
 			chains.do{ |chain, i|
@@ -163,6 +189,7 @@ FoaMatrixChain {
 		};
 
 		chains[whichChain][index].soloed = bool; // perform this solo
+		changed.add([whichChain, index, bool]);  // add this solo to changed list last
 
 		this.chainXForms;
 		changed.do{|whichDxBool|
