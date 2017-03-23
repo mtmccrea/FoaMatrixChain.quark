@@ -226,12 +226,11 @@ FoaMatrixChain {
 								// pass in preceding soundfield followed by the control
 								// values for the transform operation, in order
 								mtx = xFormDict[xf.name]['getMatrix'].( mtx, *ctlVals );
-
 								xf.mtx_( mtx ); 				// store resulting matrix
-								xf.soloed.if{break.()}	// stop chaining here if solo'd
 							},{
 								xf.mtx_( mtx ); 				// xf is muted or "thru", forward the preceding the matrix
 							});
+							xf.soloed.if{break.()}		// stop chaining here if solo'd
 						}
 					);
 				}
@@ -450,6 +449,25 @@ FoaMatrixChain {
 			],
 			{ |addMtx, receiverMtx, amountDB|
 				receiverMtx + (addMtx * amountDB.dbamp) },
+
+			'xfade-lin', [
+				'fade with', 'A0',
+				'xfade',		ControlSpec(0, 1, default: 0.5, units: "")
+			],
+			{ |thisMtx, thatMtx, fade=0|
+				(thisMtx * (1-fade)) + (thatMtx * fade);
+			},
+
+			'xfade-cos', [
+				'fade with', 'A0',
+				'xfade',		ControlSpec(0, 1, default: 0.5, units: "")
+			],
+			{ |thisMtx, thatMtx, fade=0|
+				var thisAmp, thatAmp;
+				thisAmp = cos((1-fade)*0.5pi);
+				thatAmp = cos(fade*0.5pi);
+				(thisMtx * thisAmp) + (thatMtx * thatAmp);
+			},
 
 			// input a soundfield - only used at the head of each chain
 			'input soundfield', [
