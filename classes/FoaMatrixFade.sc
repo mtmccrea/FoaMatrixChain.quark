@@ -1,107 +1,113 @@
 FoaMatrixFade {
-	classvar <mtxFadeDef;
-	// copyArgs
-	var <outbus, <inbus, initMatrix, <>xFade, <amp, addAction, target, <server, completeCond;
-	var <synth, <matrix, server, internalInbus=false, internalOutbus=false;
+    classvar <mtxFadeDef;
+    // copyArgs
+    var <outbus, <inbus, initMatrix, <>xFade, <amp, addAction, target, <server, completeCond;
+    var <synth, <matrix, server, internalInbus=false, internalOutbus=false;
 
-	*new { |outbus, inbus, initMatrix, xFade = 0.5, amp = 1,
-		addAction, target, server, completeCond|
 
-		^super.newCopyArgs(
-			outbus, inbus, initMatrix, xFade, amp,
-			addAction, target, server, completeCond).init;
-	}
+    *new { |outbus, inbus, initMatrix, xFade = 0.5, amp = 1,
+        addAction, target, server, completeCond|
 
-	init {
-		fork {
-			var addAct, targ;
-			var cond = Condition(false);
+        ^super.newCopyArgs(
+            outbus, inbus, initMatrix, xFade, amp,
+            addAction, target, server, completeCond).init;
+    }
 
-			server = server ?? Server.default;
 
-			if ( FoaMatrixFade.mtxFadeDef.isNil, {
-				FoaMatrixFade.loadSynthDefs(server, cond);
-				cond.wait;
-			});
+    init {
+        fork {
+            var addAct, targ;
+            var cond = Condition(false);
 
-			inbus ?? {
-				internalInbus = true;
-				// "No input bus specified for FoaMatrixFade, so creating an input bus for you. Get it with .inbus".postln;
-				inbus = server.audioBusAllocator.alloc( 4 );
-			};
-			outbus ?? {
-				internalOutbus = true;
-				"Creating an output bus. Get it with .outbus".postln;
-				outbus = server.audioBusAllocator.alloc( 4 );
-			};
-			addAct = addAction ?? {\addToTail};
-			targ = target ?? {1};
+            server = server ?? Server.default;
 
-			synth = Synth.new( mtxFadeDef.name, [
-				\outbus, outbus,
-				\inbus, inbus,
-				\fade, xFade,
-				\amp, amp
-			], targ, addAct );
+            if ( FoaMatrixFade.mtxFadeDef.isNil, {
+                FoaMatrixFade.loadSynthDefs(server, cond);
+                cond.wait;
+            });
 
-			server.sync;
+            inbus ?? {
+                internalInbus = true;
+                // "No input bus specified for FoaMatrixFade, so creating an input bus for you. Get it with .inbus".postln;
+                inbus = server.audioBusAllocator.alloc( 4 );
+            };
+            outbus ?? {
+                internalOutbus = true;
+                "Creating an output bus. Get it with .outbus".postln;
+                outbus = server.audioBusAllocator.alloc( 4 );
+            };
+            addAct = addAction ?? {\addToTail};
+            targ = target ?? {1};
 
-			initMatrix !? {this.matrix_(initMatrix)};
+            synth = Synth.new( mtxFadeDef.name, [
+                \outbus, outbus,
+                \inbus, inbus,
+                \fade, xFade,
+                \amp, amp
+            ], targ, addAct );
 
-			completeCond !? {completeCond.test_(true).signal;};
-		}
-	}
+            server.sync;
 
-	matrix_ { |newMatrix|
-		var flatMatrix;
+            initMatrix !? {this.matrix_(initMatrix)};
 
-		flatMatrix = case
-		{ newMatrix.isKindOf( Matrix ) } { newMatrix.asArray.flat }
-		{ newMatrix.isKindOf( FoaXformerMatrix ) } { newMatrix.matrix.asArray.flat };
+            completeCond !? {completeCond.test_(true).signal;};
+        }
+    }
 
-		synth.set(\fade, xFade, \matrixArray, flatMatrix);
 
-		// update instance var for introspection
-		matrix = newMatrix;
-	}
+    matrix_ { |newMatrix|
+        var flatMatrix;
 
-	amp_{ |amplitude|
-		synth.set(\amp, amplitude);
-		amp = amplitude;
-	}
+        flatMatrix = case
+        { newMatrix.isKindOf( Matrix ) } { newMatrix.asArray.flat }
+        { newMatrix.isKindOf( FoaXformerMatrix ) } { newMatrix.matrix.asArray.flat };
 
-	free {
-		synth.free;
-		internalInbus.if{ server.audioBusAllocator.free( inbus ) };
-		internalOutbus.if{ server.audioBusAllocator.free( outbus ) };
-	}
+        synth.set(\fade, xFade, \matrixArray, flatMatrix);
 
-	*loadSynthDefs { |server, cond|
+        // update instance var for introspection
+        matrix = newMatrix;
+    }
 
-		server.waitForBoot({
-			mtxFadeDef = SynthDef(\foaMatrixFade, { arg outbus, inbus, fade = 1.5, amp = 1;
-				var foaSrc, array, out;
 
-				foaSrc = In.ar(inbus, 4) * Lag.kr(amp);
+    amp_{ |amplitude|
+        synth.set(\amp, amplitude);
+        amp = amplitude;
+    }
 
-				array = Control.names([\matrixArray]).kr(
-					Matrix.newIdentity(4).asArray.flat // initialize with no transform
-				);
-				array = Lag.kr(array, fade); // lag the matrix swap
 
-				array = array.clump(4).flop;
+    free {
+        synth.free;
+        internalInbus.if{ server.audioBusAllocator.free( inbus ) };
+        internalOutbus.if{ server.audioBusAllocator.free( outbus ) };
+    }
 
-				out = Mix.fill( 4, { arg i; // fill input
-					array.at(i) * foaSrc.at(i)
-				});
 
-				Out.ar(outbus, out);
-			}).load(server);
+    *loadSynthDefs { |server, cond|
 
-			// wait for synthdef to load
-			server.sync;
-			cond.test_(true).signal;
-		});
+        server.waitForBoot({
+            mtxFadeDef = SynthDef(\foaMatrixFade, { arg outbus, inbus, fade = 1.5, amp = 1;
+                var foaSrc, array, out;
 
-	}
+                foaSrc = In.ar(inbus, 4) * Lag.kr(amp);
+
+                array = Control.names([\matrixArray]).kr(
+                    Matrix.newIdentity(4).asArray.flat // initialize with no transform
+                );
+                array = Lag.kr(array, fade); // lag the matrix swap
+
+                array = array.clump(4).flop;
+
+                out = Mix.fill( 4, { arg i; // fill input
+                    array.at(i) * foaSrc.at(i)
+                });
+
+                Out.ar(outbus, out);
+            }).load(server);
+
+            // wait for synthdef to load
+            server.sync;
+            cond.test_(true).signal;
+        });
+
+    }
 }
