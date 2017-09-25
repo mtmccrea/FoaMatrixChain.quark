@@ -18,7 +18,7 @@ ARGUMENT:: inbus
 A 4-channel input bus to read in to the matrix mixer. If not provided, one is created for you on a virtual audio bus, which can be queried with strong::.inbus::.
 
 ARGUMENT:: initMatrix
-Optionally provide a transform matrix through which the B-Format signal will play. The default is an identity matrix, i.e. an unchanged soundfield.
+(Optional) Provide a transform matrix through which the B-Format signal will play. The default is an identity matrix, i.e. an unchanged soundfield.
 
 ARGUMENT:: xFade
 (Optional) The crossfade time between transform matrices if the audition matrix is changed.
@@ -27,7 +27,7 @@ ARGUMENT:: amp
 An amplitude applied to the output.
 
 ARGUMENT:: addAction
-Optionally provide an addAction for placing the matrix mixer synth in a particular place in the Node Tree. Default is \addToTail.
+(Optional) Provide an addAction for placing the matrix mixer synth in a particular place in the Node Tree. Default is \addToTail.
 one of the following Symbols:
 table::
 ## \addToHead || (the default) add at the head of the group specified by target
@@ -48,6 +48,9 @@ ARGUMENT:: completeCond
 Optionally a link::Classes/Condition:: that is signalled once this has allocated all of it's resources.
 
 
+PRIVATE:: loadSynthDefs, mtxFadeDef
+
+
 INSTANCEMETHODS::
 
 METHOD:: amp
@@ -59,14 +62,25 @@ Get/set the crossfade time between transform matrices.
 METHOD:: matrix
 Get/set the transform matrix.
 
-ARGUMENT:: matrix
+ARGUMENT:: newMatrix
 When setting, provide a link::Classes/Matrix:: or link::Classes/FoaXformerMatrix:: to transform your soundfield. The new matrix will crossfade in over strong::xFade:: seconds.
+
+METHOD:: synth
+Get the matrix mix synth.
+
+METHOD:: inbus
+Get the input bus read by the matrix fading synth.
+
+METHOD:: outbus
+Get the output bus written to by the matrix fading synth.
+
+METHOD:: server
+Get the instance of code::Server:: used by the matrix fading synth.
 
 METHOD:: free
 Free the resources used by link::Classes/FoaMatrixFade::.
 
-METHOD:: synth
-Get the matrix mix synth.
+
 
 
 EXAMPLES::
